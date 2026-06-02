@@ -47,7 +47,7 @@ def build_knowledge_base():
     return all_text
 
 
-def search_documents(query, top_k=3):
+def search_documents(query, top_k=5):
     if not st.session_state.documents:
         return []
     
@@ -57,8 +57,10 @@ def search_documents(query, top_k=3):
     for doc in st.session_state.documents:
         score = 0
         content_lower = doc["content"].lower()
-        for word in query_lower.split():
-            if word in content_lower:
+        if query_lower in content_lower:
+            score += 10
+        for char in query_lower:
+            if char in content_lower:
                 score += 1
         if score > 0:
             results.append((score, doc))
@@ -67,11 +69,14 @@ def search_documents(query, top_k=3):
     return [doc for score, doc in results[:top_k]]
 
 
-def generate_answer(query, context):
-    if not context:
+def generate_answer(query, context, has_knowledge_base):
+    if not has_knowledge_base:
         return "知识库为空，请先上传文档并构建知识库后再提问。"
     
-    context_text = "\n\n".join([doc["content"] for doc in context[:3]])
+    if not context:
+        context_text = "（未检索到高度相关的文档片段）"
+    else:
+        context_text = "\n\n".join([doc["content"] for doc in context[:3]])
     
     prompt = f"""基于以下参考文档回答问题。如果文档中没有相关信息，请明确说明"文档中未找到相关答案"。
 
@@ -174,8 +179,9 @@ def main():
             
             with st.chat_message("assistant"):
                 with st.spinner("正在思考..."):
+                    has_kb = len(st.session_state.documents) > 0
                     context = search_documents(user_input)
-                    answer = generate_answer(user_input, context)
+                    answer = generate_answer(user_input, context, has_kb)
                 
                 st.markdown(answer)
                 
